@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hospital Forecasting</title>
+    
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!--nếu trường hợp chạy offline : <script src="/static/js/apexcharts.js"></script>  và  <script src="/static/js/lucide.js"></script>  , nhớ bỏ 2 file.js đó vào đúng đường dẫn-->
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!--Favicon-->
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+
+    <!-- Liên kết đến file CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        
+        <!-- HEADER BAR -->
+        <header class="header-bar">
+            <div class="header-left">
+                <h1><i data-lucide="activity" style="color: #60a5fa;"></i> AI Hospital Forecasting System</h1>
+                <p>Hệ thống AI dự báo số lượng bệnh nhân</p>
+            </div>
+            <div class="header-right">
+                <div class="badge-info">
+                    <span class="label">Last Updated</span>
+                    <span class="val" id="meta-updated">01/06/2026</span>
+                </div>
+                <div class="badge-info">
+                    <span class="label">AI Model</span>
+                    <span class="val" id="meta-model">XGBoost v1.0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTROL PANEL & MODEL INFO -->
+        <div class="control-grid">
+            <!-- Filter Controls (Nâng cấp bổ sung đầy đủ các tháng đến Tháng 12) -->
+            <div class="card control-panel">
+                <div class="control-group">
+                    <label>Tháng dự báo</label>
+                    <select class="form-select" id="filter-month" onchange="onFilterChange()">
+                        <option value="auto" selected>Tự động nhận diện (Tháng dự báo mới nhất)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>Khoảng thời gian (Horizon)</label>
+                    <div class="segmented-control" id="filter-horizon">
+                        <button class="segment-btn active" data-val="30" onclick="setHorizon(30)">30 Ngày</button>
+                        <button class="segment-btn" data-val="60" onclick="setHorizon(60)">60 Ngày</button>
+                        <button class="segment-btn" data-val="90" onclick="setHorizon(90)">90 Ngày</button>
+                        <button class="segment-btn" data-val="180" onclick="setHorizon(180)">180 Ngày</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Mô hình thuật toán</label>
+                    <select class="form-select" id="control-model-select" onchange="onControlModelChange()">
+                        <!-- Sẽ được tải động bằng Javascript dựa trên danh sách trong Registry -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Model Info Summary Card -->
+            <div class="card model-info-card">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span class="model-info-title">Thông tin mô hình AI</span>
+                    <h4 style="font-size: 16px; font-weight: 700; color: var(--primary);" id="model-name-label">Hospital_XGBoost (v1.0)</h4>
+                    <span style="font-size: 12px; color: var(--text-muted);">Huấn luyện: <strong id="model-train-date" style="color: white;">2026-06-01</strong></span>
+                </div>
+                <div class="model-stats">
+                    <div>Số đặc trưng đầu vào: <strong id="model-features-count" style="color: white;">8</strong></div>
+                    <div>Sai số MAE: <strong id="model-mae-val" style="color: #fbbf24;">574.5</strong></div>
+                    <div>Sai số WAPE: <strong id="model-mape-val" style="color: #34d399;">19.05%</strong></div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- NÂNG CẤP: GIAO DIỆN UPLOAD DỮ LIỆU & QUẢN LÝ PHIÊN BẢN MÔ HÌNH (index.html) -->
+        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div class="section-title" style="margin-bottom: 4px; border-bottom: none; padding-bottom: 0;">
+                <i data-lucide="cloud-lightning" style="color: var(--primary);"></i> Hệ thống Quản trị Phiên bản Mô hình (Model Registry)
+            </div>
+            
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+                Tải lên dữ liệu mới (`.csv` chứa hai cột `date` và `actual`) để huấn luyện lại mô hình mới. Bạn có thể tự do đối chiếu sai số và chuyển đổi qua lại giữa các phiên bản mô hình đã lưu.
+            </p>
+            
+            <!-- Khu vực Tải lên tệp dữ liệu mới -->
+            <div style="display: flex; gap: 12px; align-items: center; background: #111827; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+                <input type="file" id="upload-csv-file" accept=".csv, .xlsx, .xls" style="font-size: 12px; color: var(--text-muted); flex-grow: 1; cursor: pointer;">
+                <button onclick="triggerRetrain()" class="segment-btn active" style="font-size: 12px; padding: 8px 16px; background-color: var(--primary); white-space: nowrap;">
+                    <i data-lucide="play" style="width: 12px; height: 12px; display: inline; vertical-align: middle; margin-right: 4px;"></i> Huấn luyện lại (Retrain)
+                </button>
+            </div>
+
+            <!-- KHUNG CHÚ THÍCH THÔNG TIN VẬN HÀNH KHOA HỌC -->
+            <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); padding: 14px; border-radius: var(--radius-md); font-size: 11px; line-height: 1.5; color: var(--text-muted); display: flex; gap: 10px; align-items: flex-start; margin-top: -8px;">
+                <i data-lucide="info" style="color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px;"></i>
+                <div>
+                    <strong>💡 Hướng dẫn chọn mô hình:</strong> Sai số WAPE hiển thị dưới đây là sai số đánh giá lúc huấn luyện. Để dự báo cho hiện tại, <strong>ưu tiên tuyệt đối mô hình được gắn nhãn ⭐ Khuyên dùng (mô hình nạp dữ liệu mới nhất)</strong> . Mô hình này đã học được số liệu gần nhất của bệnh viện, giúp dự báo sát thực tế nhất và loại bỏ hiện tượng trôi dữ liệu (model càng lâu thì dự đoán xa càng dễ bị sai)
+                </div>
+            </div>
+            
+            <!-- Bảng hiển thị danh sách các phiên bản mô hình -->
+            <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: rgba(0,0,0,0.2);">
+                <table class="summary-table" style="font-size: 11px;">
+                    <thead>
+                        <tr style="background: #111827;">
+                            <th style="padding: 8px 12px;">Phiên bản / Ngày huấn luyện</th>
+                            <th style="padding: 8px 12px; text-align: center;">MAE</th>
+                            <th style="padding: 8px 12px; text-align: center;">WAPE</th>
+                            <th style="padding: 8px 12px; text-align: center;">Trạng thái</th>
+                            <th style="padding: 8px 12px; text-align: right;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="model-registry-tbody">
+                        <!-- Danh sách các phiên bản mô hình được tải động từ JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- KPI CARDS SECTION -->
+        <div class="kpi-grid">
+            <!-- Card 1: Avg Daily -->
+            <div class="card kpi-card">
+                <div class="kpi-icon primary"><i data-lucide="trending-up"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Lượt khám TB/Ngày</span>
+                    <span class="kpi-value" id="kpi-avg">4,231</span>
+                    <span class="kpi-subtext">Trong khoảng dự báo</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Peak Day -->
+            <div class="card kpi-card">
+                <div class="kpi-icon danger"><i data-lucide="flame"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Ngày cao điểm nhất</span>
+                    <span class="kpi-value" id="kpi-peak">5,726</span>
+                    <span class="kpi-subtext">Mức tải tối đa</span>
+                </div>
+            </div>
+
+            <!-- Card 3: MAE -->
+            <div class="card kpi-card">
+                <div class="kpi-icon warning"><i data-lucide="bar-chart-3"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Sai số MAE</span>
+                    <span class="kpi-value" id="kpi-mae">574.5</span>
+                    <span class="kpi-subtext">Độ lệch trung bình</span>
+                </div>
+            </div>
+
+            <!-- Card 4: WAPE (Đã sửa từ MAPE thành WAPE cho đồng bộ) do 
+            Trong ngành dự báo y tế và vận hành bệnh viện, WAPE được coi là "tiêu chuẩn vàng" thay thế cho MAPE vì lý do kỹ thuật sau:
+            Điểm yếu của MAPE: Nếu có những ngày sảnh khám có lượng bệnh nhân thực tế rất thấp hoặc bằng không (ví dụ: ngày nghỉ lễ Tết, ngày cuối tuần sụt tải sâu), công thức của MAPE sẽ phải chia cho một số rất nhỏ nằm ở mẫu số. Điều này khiến phần trăm sai số bị phóng đại lên cực đại (thậm chí tiến tới vô cùng), làm lệch hoàn toàn đánh giá về năng lực của mô hình.
+            Ưu điểm của WAPE: WAPE giải quyết triệt để vấn đề này bằng cách lấy tổng trị tuyệt đối của sai số chia cho tổng số ca khám thực tế trên cả giai đoạn. Do đó, con số WAPE có độ ổn định cao và phản ánh chính xác hơn sai số thực tế của sảnh khám bệnh viện 
+            -->
+            <div class="card kpi-card">
+                <div class="kpi-icon success"><i data-lucide="target"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Sai số WAPE</span>
+                    <span class="kpi-value" id="kpi-mape">19.05%</span>
+                    <span class="kpi-subtext">Tỷ lệ sai số trọng số %</span>
+                </div>
+            </div>
+
+            <!-- Card 5: Confidence -->
+            <div class="card kpi-card">
+                <div class="kpi-icon primary"><i data-lucide="cpu"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Độ chính xác dự báo</span>
+                    <span class="kpi-value" id="kpi-confidence">80.95%</span>
+                    <span class="kpi-subtext">100% - WAPE (Sai số trọng số)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN FORECAST CHART -->
+        <div class="card chart-card">
+            <div class="chart-header">
+                <div class="chart-title">
+                    <h3>Biểu đồ Dự báo Số lượng Lượt khám ngoại trú</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Đối chiếu song song dữ liệu Thực tế (Actual) vs Dự báo (Forecast) trong giai đoạn chuyển giao</p>
+                </div>
+                <div class="chart-legend">
+                    <div class="legend-item"><span class="legend-dot" style="background-color: var(--success);"></span> Thực tế (Actual)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background-color: var(--primary);"></span> Dự báo (Forecast)</div>
+                    <div class="legend-item"><span class="legend-dot" style="background-color: var(--warning);"></span> Khoảng tin cậy (+/- 1.96 MAE)</div>
+                
+                    <button onclick="downloadForecastCSV()" class="segment-btn active" style="font-size: 11px; padding: 4px 12px; background-color: var(--success); cursor: pointer; margin-left: 15px;">
+                        <i data-lucide="download" style="width: 11px; height: 11px; display: inline; vertical-align: middle;"></i> Xuất báo cáo (CSV)
+                    </button>
+                </div>
+            </div>
+            <div id="main-forecast-chart" style="width: 100%; height: 350px;"></div>
+        </div>
+
+        <!-- TWO COLUMN ANALYTICS ROW -->
+        <div class="analytics-grid">
+            <!-- Left Column -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Monthly Summary Table -->
+                <div class="card" style="flex-grow: 1;">
+                    <div class="section-title"><i data-lucide="calendar"></i> Thống kê Tổng quan các Tháng</div>
+                    <div class="summary-table-container">
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Tháng</th>
+                                    <th>Lượt khám Trung bình</th>
+                                    <th>Ngày cao điểm</th>
+                                    <th>Ngày thấp nhất</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-table-body">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Feature Importance Chart -->
+                <div class="card feat-card">
+                    <div class="section-title"><i data-lucide="dna"></i> Mức độ Quan trọng của Đặc trưng đầu vào</div>
+                    <div id="feature-importance-chart" style="width: 100%; height: 260px;"></div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="card dss-section">
+                <div class="section-title" style="border-bottom-color: rgba(239, 68, 68, 0.2);"><i data-lucide="shield-alert" style="color: var(--danger);"></i> Cảnh báo & Gợi ý Điều phối Vận hành</div>
+                <!-- <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Đánh giá mức độ tải trọng dựa trên ngưỡng áp lực di động thực tế và đề xuất phương án điều phối nhân sự lâm sàng phù hợp.</p> -->
+                
+                <!-- THÊM Thước đo Áp lực sảnh khám Tương tác động -->
+                <div style="background: rgba(255, 255, 255, 0.01); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+                    <!-- Vùng vẽ biểu đồ Gauge của ApexCharts -->
+                    <div id="stress-gauge-chart" style="width: 100%; height: 130px; display: flex; justify-content: center; align-items: center; margin-top: -10px;"></div>
+                    
+                    <!-- Nhãn trạng thái đi kèm thước đo -->
+                    <div style="text-align: center; margin-top: -10px;">
+                        <span id="gauge-date-label" style="font-size: 11px; color: var(--text-muted); display: block; font-weight: 500;">Hôm nay (11/06/2026)</span>
+                        <strong id="gauge-status-label" style="font-size: 13px; color: var(--success); display: block; margin-top: 4px; font-family: 'Outfit', sans-serif;">🟢 Tải thấp - Vận hành tiêu chuẩn</strong>
+                        <span id="gauge-value-label" style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Dự kiến: 3.500 ca</span>
+                    </div>
+                </div>
+                
+                <div class="dss-list" id="dss-warnings-container">
+                    <!-- Dynamic Warnings -->
+                </div>
+            </div>
+        </div>
+
+        <!-- HEATMAP CALENDAR (Nâng cấp mở rộng 12 tháng) -->
+        <div class="card heatmap-card">
+            <div class="heatmap-header">
+                <div class="chart-title">
+                    <h3>Biểu đồ nhiệt lượt khám dạng lịch tháng (Monthly Heatmap Grid)</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Click chọn các tab dưới đây để đổi tháng lịch trực quan</p>
+                </div>
+                <!-- Javascript sẽ tự động vẽ các nút bấm T1 đến T12 tại đây -->
+                <div class="calendar-tabs" id="calendar-tabs-container"></div>
+            </div>
+            
+            <!-- Calendar Grid Container -->
+            <div>
+                <div class="calendar-grid">
+                    <div class="calendar-day-header">T2 (Mon)</div>
+                    <div class="calendar-day-header">T3 (Tue)</div>
+                    <div class="calendar-day-header">T4 (Wed)</div>
+                    <div class="calendar-day-header">T5 (Thu)</div>
+                    <div class="calendar-day-header">T6 (Fri)</div>
+                    <div class="calendar-day-header">T7 (Sat)</div>
+                    <div class="calendar-day-header">CN (Sun)</div>
+                </div>
+                <div class="calendar-grid" id="calendar-cells-container">
+                    <!-- Dynamic calendar cells -->
+                </div>
+            </div>
+        
+            
+        </div>
+
+    </div>
+
+    
+    <!-- Liên kết đến file JS -->
+    <script src="/static/js/script.js"></script>
+</body>
+</html>
