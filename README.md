@@ -81,6 +81,10 @@ Nếu tiếp tục sử dụng một mô hình đã được huấn luyện từ
 
 ---
 
-## Tác giả
+## Disclaimer
 
-Đề tài được thực hiện trong quá trình thực tập với mục tiêu xây dựng hệ thống hỗ trợ dự báo lượt khám bệnh và Dashboard trực quan phục vụ công tác quản lý bệnh viện.
+This project was developed during my internship as a research and development project.
+
+The forecasting results are intended to assist hospital staff in planning and decision-making. Since the model is based on historical data, prediction errors may occur and the results should not be considered absolute values.
+
+To maintain forecasting performance, the model should be periodically retrained using the latest hospital data, as changes in patient arrival patterns over time (data drift) may reduce prediction accuracy.
