@@ -1,6 +1,6 @@
 # AI Hospital Forecasting System
 
-Hệ thống dự báo số lượng bệnh nhân khám ngoại trú sử dụng XGBoost Regressor kết hợp Dashboard trực quan trên nền tảng Flask.
+Hệ thống dự báo số lượng bệnh nhân khám bệnh sử dụng XGBoost Regressor kết hợp Dashboard trực quan trên nền tảng Flask.
 ## ⚠️ Lưu ý
 
 Đây là **mô hình dự báo**, vì vậy kết quả chỉ mang tính hỗ trợ ra quyết định và **không đảm bảo chính xác tuyệt đối**.
